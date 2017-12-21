@@ -329,8 +329,8 @@ class TrainingModel(model.SockeyeModel):
                               "Try a fixed schedule such as %s." % C.LR_SCHEDULER_FIXED_RATE_INV_SQRT_T)
         utils.check_condition(not lr_decay_param_reset, "Parameter reset when the learning rate decays not "
                                                         "supported with distributed training.")
-        utils.check_condition(not lr_decay_opt_states_reset, "Optimizer state reset when the learning rate decays "
-                                                             "not supported with distributed training.")
+        #utils.check_condition(not lr_decay_opt_states_reset, "Optimizer state reset when the learning rate decays "
+        #                                                     "not supported with distributed training.")
 
     def _get_curr_module(self):
         # As the BucketingModule does not expose all methods of the underlying Module we need to directly access
