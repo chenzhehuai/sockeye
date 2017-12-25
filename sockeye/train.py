@@ -32,7 +32,7 @@ from . import arguments
 from . import constants as C
 from . import convolution
 from . import coverage
-from . import data_io
+from . import data_io_kaldi as data_io 
 from . import decoder
 from . import encoder
 from . import initializer

@@ -103,9 +103,10 @@ class TrainingModel(model.SockeyeModel):
         """
         #utils.check_condition(train_iter.pad_id == C.PAD_ID == 0, "pad id should be 0")
         source = mx.sym.Variable(C.SOURCE_NAME)
-        source_length = utils.compute_lengths(source)
+        #source_length = utils.compute_lengths(source)
         target = mx.sym.Variable(C.TARGET_NAME)
         target_length = utils.compute_lengths(target)
+        source_length=target_length #batch_size
         labels = mx.sym.reshape(data=mx.sym.Variable(C.TARGET_LABEL_NAME), shape=(-1,))
 
         model_loss = loss.get_loss(self.config.config_loss)
@@ -121,9 +122,12 @@ class TrainingModel(model.SockeyeModel):
             source_seq_len, target_seq_len = seq_lens
 
             # source embedding
-            (source_embed,
-             source_embed_length,
-             source_embed_seq_len) = self.embedding_source.encode(source, source_length, source_seq_len)
+            source_embed=source
+            source_embed_length=source_length
+            source_embed_seq_len=source_seq_len
+            #(source_embed,
+            # source_embed_length,
+            # source_embed_seq_len) = self.embedding_source.encode(source, source_length, source_seq_len)
 
             # target embedding
             (target_embed,
@@ -137,7 +141,6 @@ class TrainingModel(model.SockeyeModel):
              source_encoded_seq_len) = self.encoder.encode(source_embed,
                                                            source_embed_length,
                                                            source_embed_seq_len)
-
             # decoder
             # target_decoded: (batch-size, target_len, decoder_depth)
             target_decoded = self.decoder.decode_sequence(source_encoded, source_encoded_length, source_encoded_seq_len,
