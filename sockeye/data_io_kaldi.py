@@ -524,7 +524,7 @@ def prepare_data(source: str, target: str,
                                          length_ratio_std=length_statistics.length_ratio_std,
                                          output_prefix=output_prefix)
     data_statistics.log()
-    #hasn't imp
+    print("hasn't imp................")
     data_loader = RawParallelDatasetLoader(buckets=buckets,
                                            eos_id=vocab_target[C.EOS_SYMBOL],
                                            pad_id=C.PAD_ID)
@@ -678,7 +678,7 @@ def get_prepared_data_iters(prepared_data_dir: str,
 
     data_config.data_statistics.log(bucket_batch_sizes)
 
-    #un imp
+    print("hasn't imp................")
     train_iter = ShardedParallelSampleIter(shard_fnames,
                                            buckets,
                                            batch_size,
@@ -1321,7 +1321,7 @@ class ShardedParallelSampleIter(BaseParallelSampleIter):
         dataset = ParallelDataSet.load(self.shards_fnames[self.shard_index]).fill_up(self.bucket_batch_sizes,
                                                                                      self.fill_up,
                                                                                      seed=self.shard_index)
-        print("unfini ParallelSampleIter source_embed_size here...")
+        print("unfini ParallelSampleIter source_embed_size here......")
         self.shard_iter = ParallelSampleIter(dataset,
                                              self.buckets,
                                              self.batch_size,

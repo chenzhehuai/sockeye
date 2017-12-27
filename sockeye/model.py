@@ -166,15 +166,15 @@ class SockeyeModel:
         with open(fname, "w") as out:
             out.write(__version__)
 
-    def _get_embed_weights(self) -> Tuple[mx.sym.Symbol, mx.sym.Symbol, mx.sym.Symbol]:
+    def _get_embed_weights(self) -> Tuple[mx.sym.Symbol, mx.sym.Symbol]:
         """
         Returns embedding parameters for source and target.
 
         :return: Tuple of source and target parameter symbols.
         """
-        w_embed_source = mx.sym.Variable(C.SOURCE_EMBEDDING_PREFIX + "weight",
-                                         shape=(self.config.config_embed_source.vocab_size,
-                                                self.config.config_embed_source.num_embed))
+        #w_embed_source = mx.sym.Variable(C.SOURCE_EMBEDDING_PREFIX + "weight",
+        #                                 shape=(self.config.config_embed_source.vocab_size,
+        #                                        self.config.config_embed_source.num_embed))
         w_embed_target = mx.sym.Variable(C.TARGET_EMBEDDING_PREFIX + "weight",
                                          shape=(self.config.config_embed_target.vocab_size,
                                                 self.config.config_embed_target.num_embed))
@@ -182,12 +182,12 @@ class SockeyeModel:
                                        shape=(self.config.vocab_target_size, self.decoder.get_num_hidden()))
 
         if self.config.weight_tying:
-            if C.WEIGHT_TYING_SRC in self.config.weight_tying_type \
-                    and C.WEIGHT_TYING_TRG in self.config.weight_tying_type:
-                logger.info("Tying the source and target embeddings.")
-                w_embed_source = w_embed_target = mx.sym.Variable(C.SHARED_EMBEDDING_PREFIX + "weight",
-                                                                  shape=(self.config.config_embed_source.vocab_size,
-                                                                         self.config.config_embed_source.num_embed))
+            #if C.WEIGHT_TYING_SRC in self.config.weight_tying_type \
+            #        and C.WEIGHT_TYING_TRG in self.config.weight_tying_type:
+            #    logger.info("Tying the source and target embeddings.")
+            #    w_embed_source = w_embed_target = mx.sym.Variable(C.SHARED_EMBEDDING_PREFIX + "weight",
+            #                                                      shape=(self.config.config_embed_source.vocab_size,
+            #                                                             self.config.config_embed_source.num_embed))
 
             if C.WEIGHT_TYING_SOFTMAX in self.config.weight_tying_type:
                 logger.info("Tying the target embeddings and output layer parameters.")
@@ -197,7 +197,7 @@ class SockeyeModel:
                                                                   self.decoder.get_num_hidden()))
                 w_out_target = w_embed_target
 
-        return w_embed_source, w_embed_target, w_out_target
+        return w_embed_target, w_out_target
 
     def _build_model_components(self):
         """
@@ -208,7 +208,7 @@ class SockeyeModel:
         self.decoder = decoder.get_decoder(self.config.config_decoder)
 
         # source & target embeddings
-        embed_weight_source, embed_weight_target, out_weight_target = self._get_embed_weights()
+        embed_weight_target, out_weight_target = self._get_embed_weights() #embed_weight_source, 
         #self.embedding_source = encoder.Embedding(self.config.config_embed_source,
         #                                          prefix=C.SOURCE_EMBEDDING_PREFIX,
         #                                          embed_weight=embed_weight_source)
