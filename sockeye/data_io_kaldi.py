@@ -928,7 +928,7 @@ def read_content(path: str, itype: str, limit: Optional[int] = None) -> Iterator
             yield mat
     elif itype == "lab":
         for key,mat in kaldi_io.read_vec_int_ark(path):
-            yield mat+1
+            yield mat+1 #make it start from 1: in decoder, use # of !=0 to count length
     else:
         with smart_open(path) as indata:
             for i, line in enumerate(indata):
