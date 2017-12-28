@@ -35,6 +35,8 @@ from .utils import check_condition, smart_open, get_tokens, OnlineMeanAndVarianc
 
 import kaldi_io
 
+import sys
+
 logger = logging.getLogger(__name__)
 
 
@@ -1510,24 +1512,33 @@ class ParallelSampleIter(BaseParallelSampleIter):
 
 #debug
 def main():
-    source="/fgfs/users/zhc00/works/ctc/allctc/mxnet/nmt.exp/tmp/test.txt"
-    source_sentences = SequenceReader(source, None, add_bos=False)
-    for source in source_sentences:
-        print(source)
-        break
+    #source="/fgfs/users/zhc00/works/ctc/allctc/mxnet/nmt.exp/tmp/test.txt"
+    #source_sentences = SequenceReader(source, None, add_bos=False)
+    #for source in source_sentences:
+    #    print(source)
+    #    break
 
-    source="/fgfs/users/zhc00/works/ctc/allctc/mxnet/nmt.exp/tmp/feats.scp"
-    source_sentences = SequenceReader(source, None, add_bos=False)
-    for source in source_sentences:
-        print(source)
-        break
+    #source="/fgfs/users/zhc00/works/ctc/allctc/mxnet/nmt.exp/tmp/feats.scp"
+    #source_sentences = SequenceReader(source, None, add_bos=False)
+    #for source in source_sentences:
+    #    print(source)
+    #    break
     
-    source="/fgfs/users/zhc00/works/ctc/allctc/mxnet/nmt.exp/tmp/label.txt"
+    #source="/fgfs/users/zhc00/works/ctc/allctc/mxnet/nmt.exp/tmp/label.txt"
+    #source_sentences = SequenceReader(source, None, add_bos=False)
+    #for source in source_sentences:
+    #    print(source)
+    #    break
+
+    if len(sys.argv):
+        source=sys.argv[1]
+    else:
+        source="/fgfs/users/zhc00/works/ctc/allctc/mxnet/nmt.exp/tmp/label.txt"
     source_sentences = SequenceReader(source, None, add_bos=False)
     for source in source_sentences:
         print(source)
+        print(len(source))
         break
-
 
 if __name__ == "__main__":
     main()
