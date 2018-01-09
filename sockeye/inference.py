@@ -23,7 +23,7 @@ import mxnet as mx
 import numpy as np
 
 from . import constants as C
-from . import data_io
+from . import data_io_kaldi as data_io
 from . import lexicon
 from . import model
 from . import utils
@@ -60,7 +60,8 @@ class InferenceModel(model.SockeyeModel):
                  softmax_temperature: Optional[float] = None,
                  max_output_length_num_stds: int = C.DEFAULT_NUM_STD_MAX_OUTPUT_LENGTH,
                  decoder_return_logit_inputs: bool = False,
-                 cache_output_layer_w_b: bool = False) -> None:
+                 cache_output_layer_w_b: bool = False,
+                 input_dim: int = 1) -> None:
         self.model_version = utils.load_version(os.path.join(model_folder, C.VERSION_NAME))
         logger.info("Model version: %s", self.model_version)
         utils.check_version(self.model_version)
@@ -91,6 +92,7 @@ class InferenceModel(model.SockeyeModel):
         self.decoder_return_logit_inputs = decoder_return_logit_inputs
 
         self.cache_output_layer_w_b = cache_output_layer_w_b
+        self.input_dim = input_dim 
         self.output_layer_w = None  # type: mx.nd.NDArray
         self.output_layer_b = None  # type: mx.nd.NDArray
 
@@ -123,7 +125,6 @@ class InferenceModel(model.SockeyeModel):
 
         self.encoder_module, self.encoder_default_bucket_key = self._get_encoder_module()
         self.decoder_module, self.decoder_default_bucket_key = self._get_decoder_module()
-
         self.decoder_data_shapes_cache = dict()  # bucket_key -> shape cache
         max_encoder_data_shapes = self._get_encoder_data_shapes(self.encoder_default_bucket_key)
         max_decoder_data_shapes = self._get_decoder_data_shapes(self.decoder_default_bucket_key)
@@ -156,12 +157,15 @@ class InferenceModel(model.SockeyeModel):
 
         def sym_gen(source_seq_len: int):
             source = mx.sym.Variable(C.SOURCE_NAME)
-            source_length = utils.compute_lengths(source)
+            source_length = utils.compute_lengths(mx.sym.flatten(mx.sym.slice_axis(source,axis=2,begin=0,end=1)))
 
             # source embedding
-            (source_embed,
-             source_embed_length,
-             source_embed_seq_len) = self.embedding_source.encode(source, source_length, source_seq_len)
+            #(source_embed,
+            # source_embed_length,
+            # source_embed_seq_len) = self.embedding_source.encode(source, source_length, source_seq_len)
+            source_embed=source
+            source_embed_length=source_length
+            source_embed_seq_len=source_seq_len
 
             # encoder
             # source_encoded: (source_encoded_length, batch_size, encoder_depth)
@@ -207,7 +211,8 @@ class InferenceModel(model.SockeyeModel):
             computation, controlled by decoder_return_logit_inputs
             """
             source_seq_len, decode_step = bucket_key
-            source_embed_seq_len = self.embedding_source.get_encoded_seq_len(source_seq_len)
+            source_embed_seq_len = source_seq_len
+            #source_embed_seq_len = self.embedding_source.get_encoded_seq_len(source_seq_len)
             source_encoded_seq_len = self.encoder.get_encoded_seq_len(source_embed_seq_len)
 
             self.decoder.reset()
@@ -256,8 +261,13 @@ class InferenceModel(model.SockeyeModel):
         :param bucket_key: Maximum input length.
         :return: List of data descriptions.
         """
-        return [mx.io.DataDesc(name=C.SOURCE_NAME,
+        if self.input_dim == 1:
+            return [mx.io.DataDesc(name=C.SOURCE_NAME,
                                shape=(self.batch_size, bucket_key),
+                               layout=C.BATCH_MAJOR)]
+        else:
+            return [mx.io.DataDesc(name=C.SOURCE_NAME,
+                               shape=(self.batch_size, bucket_key, self.input_dim),
                                layout=C.BATCH_MAJOR)]
 
     def _get_decoder_data_shapes(self, bucket_key: Tuple[int, int]) -> List[mx.io.DataDesc]:
@@ -363,7 +373,8 @@ def load_models(context: mx.context.Context,
                 softmax_temperature: Optional[float] = None,
                 max_output_length_num_stds: int = C.DEFAULT_NUM_STD_MAX_OUTPUT_LENGTH,
                 decoder_return_logit_inputs: bool = False,
-                cache_output_layer_w_b: bool = False) -> Tuple[List[InferenceModel], Dict[str, int], Dict[str, int]]:
+                cache_output_layer_w_b: bool = False,
+                input_dim: int = 1) -> Tuple[List[InferenceModel], Dict[str, int], Dict[str, int]]:
     """
     Loads a list of models for inference.
 
@@ -394,7 +405,8 @@ def load_models(context: mx.context.Context,
                                softmax_temperature=softmax_temperature,
                                checkpoint=checkpoint,
                                decoder_return_logit_inputs=decoder_return_logit_inputs,
-                               cache_output_layer_w_b=cache_output_layer_w_b)
+                               cache_output_layer_w_b=cache_output_layer_w_b,
+                               input_dim=input_dim)
         models.append(model)
 
     utils.check_condition(vocab.are_identical(*source_vocabs), "Source vocabulary ids do not match")
@@ -698,7 +710,8 @@ class Translator:
                  models: List[InferenceModel],
                  vocab_source: Dict[str, int],
                  vocab_target: Dict[str, int],
-                 restrict_lexicon: Optional[lexicon.TopKLexicon] = None) -> None:
+                 restrict_lexicon: Optional[lexicon.TopKLexicon] = None,
+                 input_dim: int = 1) -> None:
         self.context = context
         self.length_penalty = length_penalty
         self.vocab_source = vocab_source
@@ -714,6 +727,7 @@ class Translator:
         # after models are loaded we ensured that they agree on max_input_length, max_output_length and batch size
         self.max_input_length = self.models[0].max_input_length
         max_output_length = self.models[0].get_max_output_length(self.max_input_length)
+        self.input_dim = input_dim
         if bucket_source_width > 0:
             self.buckets_source = data_io.define_buckets(self.max_input_length, step=bucket_source_width)
         else:
@@ -751,8 +765,8 @@ class Translator:
         # pylint: disable=invalid-unary-operand-type
         return -mx.nd.log(mx.nd.softmax(log_probs))
 
-    @staticmethod
-    def make_input(sentence_id: int, sentence: str) -> TranslatorInput:
+    #@staticmethod
+    def make_input(self, sentence_id: int, sentence: str) -> TranslatorInput:
         """
         Returns TranslatorInput from input_string
 
@@ -760,8 +774,12 @@ class Translator:
         :param sentence: Input sentence.
         :return: Input for translate method.
         """
-        tokens = list(data_io.get_tokens(sentence))
-        return TranslatorInput(id=sentence_id, sentence=sentence.rstrip(), tokens=tokens)
+        if self.input_dim == 1:
+            tokens = list(data_io.get_tokens(sentence))
+            return TranslatorInput(id=sentence_id, sentence=sentence.rstrip(), tokens=tokens)
+        else:
+            tokens = list(sentence)
+            return TranslatorInput(id=sentence_id, sentence=sentence, tokens=tokens)
 
     def translate(self, trans_inputs: List[TranslatorInput]) -> List[TranslatorOutput]:
         """
@@ -838,9 +856,13 @@ class Translator:
         bucket_key = data_io.get_bucket(max(len(tokens) for tokens in sequences), self.buckets_source)
 
         utils.check_condition(C.PAD_ID == 0, "pad id should be 0")
-        source = mx.nd.zeros((len(sequences), bucket_key))
+        source = mx.nd.zeros((len(sequences), bucket_key, self.input_dim))
         for j, tokens in enumerate(sequences):
-            source[j, :len(tokens)] = data_io.tokens2ids(tokens, self.vocab_source)
+            if self.input_dim == 1:
+                source[j, :len(tokens)] = data_io.tokens2ids(tokens, self.vocab_source)
+            else:
+                source[j, :len(tokens)] = tokens
+
         return source, bucket_key
 
     def _make_result(self,
@@ -1030,13 +1052,13 @@ class Translator:
 
             pad_dist = mx.nd.full((self.batch_size * self.beam_size, vocab_slice_ids.shape[0]),
                                   val=np.inf, ctx=self.context)
+
             for m in self.models:
                 models_output_layer_w.append(m.output_layer_w.take(vocab_slice_ids))
                 models_output_layer_b.append(m.output_layer_b.take(vocab_slice_ids))
 
         # (0) encode source sentence, returns a list
         model_states = self._encode(source, source_length)
-
         for t in range(1, max_output_length):
 
             # (1) obtain next predictions and advance models' state

@@ -9,6 +9,7 @@ sockeye/constants.py
 sockeye/convolution.py
 sockeye/coverage.py
 sockeye/data_io.py
+sockeye/data_io_kaldi.py
 sockeye/decoder.py
 sockeye/embeddings.py
 sockeye/encoder.py

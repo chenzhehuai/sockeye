@@ -941,6 +941,11 @@ def add_inference_args(params):
                                help='If not given, chooses best checkpoints for model(s). '
                                     'If specified, must have the same length as --models and be integer')
 
+    decode_params.add_argument('--input-dim', 
+                               type=int_greater_or_equal(1),
+                               default=1,
+                               help='input dim. Default: %(default)s.')
+
     decode_params.add_argument('--beam-size', '-b',
                                type=int_greater_or_equal(1),
                                default=5,

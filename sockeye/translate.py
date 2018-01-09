@@ -26,7 +26,7 @@ import mxnet as mx
 import sockeye
 import sockeye.arguments as arguments
 import sockeye.constants as C
-import sockeye.data_io
+import sockeye.data_io_kaldi as data_io
 import sockeye.inference
 from sockeye.lexicon import TopKLexicon
 import sockeye.output_handler
@@ -72,7 +72,8 @@ def main():
             args.softmax_temperature,
             args.max_output_length_num_stds,
             decoder_return_logit_inputs=args.restrict_lexicon is not None,
-            cache_output_layer_w_b=args.restrict_lexicon is not None)
+            cache_output_layer_w_b=args.restrict_lexicon is not None,
+            input_dim=args.input_dim)
         restrict_lexicon = None # type: TopKLexicon
         if args.restrict_lexicon:
             restrict_lexicon = TopKLexicon(vocab_source, vocab_target)
@@ -85,7 +86,8 @@ def main():
                                                   models,
                                                   vocab_source,
                                                   vocab_target,
-                                                  restrict_lexicon)
+                                                  restrict_lexicon,
+                                                  input_dim=args.input_dim)
         read_and_translate(translator, output_handler, args.chunk_size, args.input)
 
 
@@ -99,7 +101,14 @@ def read_and_translate(translator: sockeye.inference.Translator, output_handler:
     :param chunk_size: The size of the portion to read at a time from the input.
     :param source: Path to file which will be translated line-by-line if included, if none use stdin.
     """
-    source_data = sys.stdin if source is None else sockeye.data_io.smart_open(source)
+    if source is None:
+        source_data = sys.stdin  
+    elif source.find("scp")!=-1:
+        source_data = data_io.read_content(source, "scp")
+    elif source.find("lab")!=-1:
+        source_data = data_io.read_content(source, "lab")
+    else:
+        sockeye.data_io.smart_open(source)
 
     batch_size = translator.batch_size
     if chunk_size is None:
