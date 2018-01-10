@@ -56,7 +56,7 @@ python3 -m sockeye.train -s $scp \
                         -vs $vscp \
                         -vt $vlab \
                         --metrics perplexity accuracy \
-                        --source-vocab $vocab \
+                        --target-vocab $vocab \
                         --num-embed $idim:620 \
                         --rnn-num-hidden 1000 \
                         --rnn-attention-type mlp \
