@@ -6,7 +6,6 @@
 . path.sh
 
 #/cm/shared/apps/sockeye/1.15.1/lib/python3.6/site-packages/sockeye/train.py
-
 #config init
 stage=0
 na=nmt_model_nist_cn_en.1a
@@ -20,16 +19,17 @@ vscp="../nmt.exp/tmp/feats.scp"
 vlab="../nmt.exp/tmp/label.ctc.txt"
 test_scp="../nmt.exp/tmp/feats.scp"
 addin=""
+translate_addin=""
+tsuffix=""
 
 . parse_options.sh || exit 1;
 
-set -x
 #config after
 fmb=`echo "$ngpus $mb"|awk '{print $1*$2}'`
 #fmb=$mb
 #scp="/fgfs/users/zhc00/works/ctc/allctc/mxnet/nmt.exp/tmp/feats.scp"
 dir=exp/$na/train
-tdir=exp/$na/test
+tdir=exp/$na/test$tsuffix
 ldir=exp/$na/lock
 
 ie_size=`echo "$idim 4"| awk '{print $1-$2}'`
@@ -50,7 +50,6 @@ if [ $stage -le 0 ]; then
 awk 'BEGIN{id=0;printf "{";st=1;print "";printf "\"<pad>\": "id"";id++;print ",";printf "\"<unk>\": "id"";id++;print ",";printf "\"<s>\": "id"";id++;print ",";printf "\"</s>\": "id"";id++}$0~"<unk>"{$1="<unk2>"}{print ",";printf "\""$1"\": "id"";id++}END{print"\n}"}' $dataset/nn.osym > $vocab
 #                       --use-tensorboard \
 python3 -m sockeye.train -s $scp \
-                        --overwrite-output \
                         --kvstore $kvstore \
                         -t $lab \
                         -vs $vscp \
@@ -81,12 +80,19 @@ fi
 
 if [ $stage -le 1 ]; then
 mkdir -p $tdir
-python3 -m sockeye.translate --input-dim $idim -m $dir --input $test_scp --output $tdir/rst.raw 2>&1 | tee $tdir/rst.log
+#    --length-penalty-beta -2 \
+python3 -m sockeye.translate \
+    --batch-size $fmb \
+    --device-ids -$ngpus \
+    $translate_addin \
+    --input-dim $idim -m $dir --input $test_scp --output $tdir/rst.raw 2>&1 | tee $tdir/rst.log
 
 fi
 
 if [ $stage -le 2 ]; then
 tail  $tdir/rst.raw
+ll $tdir/rst.raw
+cp $tdir/rst.raw $tdir/rst.raw.back
 #scoring
 bash scripts/score.sh $tdir `dirname $test_scp` $dataset
 fi

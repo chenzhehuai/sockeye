@@ -15,7 +15,7 @@ dataset=$3
 ra=$dir/rst.1
 
 if [ $stage -le 1 ]; then
-    awk 'NR==FNR{if (NF>0){d[NR]=$0}else{d[NR]="<blk>"}}NR!=FNR{if (d[FNR]==""){d[FNR]="<blk>"}print $1,d[FNR]}'  $dir/rst $data/feats.scp > $ra
+    awk 'NR==FNR{if (NF>0){d[NR]=$0}}NR!=FNR{if (d[FNR]==""){d[FNR]="uhhuh"}print $1,d[FNR]}'  $dir/rst.raw $data/feats.scp > $ra
 fi
 
 if [ $stage -le 2 ]; then

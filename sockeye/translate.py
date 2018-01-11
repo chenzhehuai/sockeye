@@ -127,8 +127,15 @@ def read_and_translate(translator: sockeye.inference.Translator, output_handler:
     logger.info("Translating...")
 
     total_time, total_lines = 0.0, 0
+    cnt=0
+    p=0
     for chunk in grouper(source_data, chunk_size):
-        chunk_time = translate(output_handler, chunk, translator, total_lines)
+        if cnt%10 == 0:
+            p=cnt
+        else:
+            p=0
+        cnt+=1
+        chunk_time = translate(output_handler, chunk, translator, total_lines, p)
         total_lines += len(chunk)
         total_time += chunk_time
 
@@ -141,7 +148,7 @@ def read_and_translate(translator: sockeye.inference.Translator, output_handler:
 
 
 def translate(output_handler: sockeye.output_handler.OutputHandler, source_data: Iterable[str],
-                    translator: sockeye.inference.Translator, chunk_id: int = 0) -> float:
+        translator: sockeye.inference.Translator, chunk_id: int = 0, p: int = 0) -> float:
     """
     Translates each line from source_data, calling output handler after translating a batch.
 
@@ -158,6 +165,9 @@ def translate(output_handler: sockeye.output_handler.OutputHandler, source_data:
     total_time = time.time() - tic
     batch_time = total_time / len(trans_inputs)
     for trans_input, trans_output in zip(trans_inputs, trans_outputs):
+        if p:
+            print("chunk:%i %s"%(p,trans_output.translation))
+            p=0
         output_handler.handle(trans_input, trans_output, batch_time)
     return total_time
 
