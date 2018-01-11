@@ -86,6 +86,7 @@ class CheckpointDecoder:
         self.model = model
         self.input_dim=input_dim
         self.target_sentences=None
+        self.args=args
 
         input_sentences = list(data_io.read_content(inputs, "scp"))
         target_sentences = list(data_io.read_content(references, "lab"))
@@ -122,7 +123,7 @@ class CheckpointDecoder:
                                                                    self.batch_size,
                                                                    [self.model],
                                                                    [checkpoint],
-                                                                   softmax_temperature=args.softmax_temperature,
+                                                                   softmax_temperature=self.args.softmax_temperature,
                                                                    max_output_length_num_stds=self.max_output_length_num_stds,
                                         input_dim=self.input_dim)
         if not self.target_sentences:
@@ -131,7 +132,7 @@ class CheckpointDecoder:
         translator = inference.Translator(self.context,
                                           self.ensemble_mode,
                                           self.bucket_width_source,
-                                          inference.LengthPenalty(args.length_penalty_alpha, args.length_penalty_beta),
+                                          inference.LengthPenalty(self.args.length_penalty_alpha, self.args.length_penalty_beta),
                                           models,
                                           vocab_source,
                                           vocab_target,
