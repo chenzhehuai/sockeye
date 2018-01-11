@@ -648,6 +648,7 @@ def create_training_model(model_config: model.ModelConfig,
                                             bucketing=not args.no_bucketing,
                                             lr_scheduler=lr_scheduler_instance,
                                             gradient_compression_params=gradient_compression_params(args),
+                                            args=args,
                                             input_dim=args.input_dim)
 
     # We may consider loading the params in TrainingModule, for consistency

@@ -14,6 +14,7 @@
 """
 Code for training
 """
+import argparse
 import glob
 import logging
 import os
@@ -87,6 +88,7 @@ class TrainingModel(model.SockeyeModel):
                  train_iter: data_io.BaseParallelSampleIter,
                  bucketing: bool,
                  lr_scheduler,
+                 args: argparse.Namespace,
                  gradient_compression_params: Optional[Dict[str, Any]] = None,
                  input_dim: int = 1) -> None:
         super().__init__(config)
@@ -98,6 +100,7 @@ class TrainingModel(model.SockeyeModel):
         self.module = self._build_module(train_iter)
         self.training_monitor = None  # type: Optional[callback.TrainingMonitor]
         self.input_dim=input_dim
+        self.args=args
 
     def _build_module(self, train_iter: data_io.BaseParallelSampleIter):
         """
@@ -285,6 +288,7 @@ class TrainingModel(model.SockeyeModel):
                                                           decode_and_evaluate_fname_source,
                                                           decode_and_evaluate_fname_target,
                                                           output_folder,
+                                                          self.args,
                                                           sample_size=decode_and_evaluate,
                                                           input_dim=self.input_dim) \
             if decode_and_evaluate else None

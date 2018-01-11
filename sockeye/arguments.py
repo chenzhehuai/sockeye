@@ -901,6 +901,27 @@ def add_training_args(params):
                               default=-1,
                               help='Keep only the last n params files, use -1 to keep all files. Default: %(default)s')
 
+    #from add_inference_args
+    decode_params=train_params
+    decode_params.add_argument('--softmax-temperature',
+                               type=float,
+                               default=None,
+                               help='Controls peakiness of model predictions. Values < 1.0 produce '
+                                    'peaked predictions, values > 1.0 produce smoothed distributions.')
+    decode_params.add_argument('--length-penalty-alpha',
+                               default=1.0,
+                               type=float,
+                               help='Alpha factor for the length penalty used in beam search: '
+                                    '(beta + len(Y))**alpha/(beta + 1)**alpha. A value of 0.0 will therefore turn off '
+                                    'length normalization. Default: %(default)s')
+    decode_params.add_argument('--length-penalty-beta',
+                               default=0.0,
+                               type=float,
+                               help='Beta factor for the length penalty used in beam search: '
+                                    '(beta + len(Y))**alpha/(beta + 1)**alpha. Default: %(default)s')
+
+
+
 
 def add_train_cli_args(params):
     add_training_io_args(params)

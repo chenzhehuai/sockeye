@@ -18,6 +18,7 @@ import logging
 import os
 import random
 import time
+import argparse
 from typing import Dict, Optional
 
 import mxnet as mx
@@ -60,6 +61,7 @@ class CheckpointDecoder:
                  inputs: str,
                  references: str,
                  model: str,
+                 args: argparse.Namespace,
                  max_input_len: Optional[int] = None,
                  beam_size: int = C.DEFAULT_BEAM_SIZE,
                  bucket_width_source: int = 10,
@@ -120,7 +122,7 @@ class CheckpointDecoder:
                                                                    self.batch_size,
                                                                    [self.model],
                                                                    [checkpoint],
-                                                                   softmax_temperature=self.softmax_temperature,
+                                                                   softmax_temperature=args.softmax_temperature,
                                                                    max_output_length_num_stds=self.max_output_length_num_stds,
                                         input_dim=self.input_dim)
         if not self.target_sentences:
@@ -129,7 +131,7 @@ class CheckpointDecoder:
         translator = inference.Translator(self.context,
                                           self.ensemble_mode,
                                           self.bucket_width_source,
-                                          inference.LengthPenalty(self.length_penalty_alpha, self.length_penalty_beta),
+                                          inference.LengthPenalty(args.length_penalty_alpha, args.length_penalty_beta),
                                           models,
                                           vocab_source,
                                           vocab_target,
