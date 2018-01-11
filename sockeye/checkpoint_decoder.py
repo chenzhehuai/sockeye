@@ -26,9 +26,10 @@ import sockeye.output_handler
 from . import evaluate
 from . import chrf
 from . import constants as C
-from . import data_io
+from . import data_io_kaldi as data_io
 from . import inference
 from . import utils
+from . import vocab
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,8 @@ class CheckpointDecoder:
                  max_output_length_num_stds: int = C.DEFAULT_NUM_STD_MAX_OUTPUT_LENGTH,
                  ensemble_mode: str = 'linear',
                  sample_size: int = -1,
-                 random_seed: int = 42) -> None:
+                 random_seed: int = 42,
+                 input_dim: int = 1) -> None:
         self.context = context
         self.max_input_len = max_input_len
         self.max_output_length_num_stds = max_output_length_num_stds
@@ -80,30 +82,27 @@ class CheckpointDecoder:
         self.length_penalty_beta = length_penalty_beta
         self.softmax_temperature = softmax_temperature
         self.model = model
-        with data_io.smart_open(inputs) as inputs_fin, data_io.smart_open(references) as references_fin:
-            input_sentences = inputs_fin.readlines()
-            target_sentences = references_fin.readlines()
-            utils.check_condition(len(input_sentences) == len(target_sentences), "Number of sentence pairs do not match")
-            if sample_size <= 0:
-                sample_size = len(input_sentences)
-            if sample_size < len(input_sentences):
-                # custom random number generator to guarantee the same samples across runs in order to be able to
-                # compare metrics across independent runs
-                random_gen = random.Random(random_seed)
-                self.input_sentences, self.target_sentences = zip(
-                    *random_gen.sample(list(zip(input_sentences, target_sentences)),
-                                       sample_size))
-            else:
-                self.input_sentences, self.target_sentences = input_sentences, target_sentences
+        self.input_dim=input_dim
+        self.target_sentences=None
+
+        input_sentences = list(data_io.read_content(inputs, "scp"))
+        target_sentences = list(data_io.read_content(references, "lab"))
+        if sample_size <= 0:
+            sample_size = len(input_sentences)
+        if sample_size < len(input_sentences):
+            # custom random number generator to guarantee the same samples across runs in order to be able to
+            # compare metrics across independent runs
+            random_gen = random.Random(random_seed)
+            self.input_sentences, self.target_sentences_a = zip(
+                *random_gen.sample(list(zip(input_sentences, target_sentences)),
+                                   sample_size))
+        else:
+            self.input_sentences, self.target_sentences_a = input_sentences, target_sentences
 
         logger.info("Created CheckpointDecoder(max_input_len=%d, beam_size=%d, model=%s, num_sentences=%d)",
                     max_input_len if max_input_len is not None else -1,
                     beam_size, model, len(self.input_sentences))
 
-        with data_io.smart_open(os.path.join(self.model, C.DECODE_REF_NAME), 'w') as trg_out, \
-                data_io.smart_open(os.path.join(self.model, C.DECODE_IN_NAME), 'w') as src_out:
-            [trg_out.write(s) for s in self.target_sentences]
-            [src_out.write(s) for s in self.input_sentences]
 
     def decode_and_evaluate(self,
                             checkpoint: Optional[int] = None,
@@ -122,14 +121,19 @@ class CheckpointDecoder:
                                                                    [self.model],
                                                                    [checkpoint],
                                                                    softmax_temperature=self.softmax_temperature,
-                                                                   max_output_length_num_stds=self.max_output_length_num_stds)
+                                                                   max_output_length_num_stds=self.max_output_length_num_stds,
+                                        input_dim=self.input_dim)
+        if not self.target_sentences:
+            vocab_target_inv = vocab.reverse_vocab(vocab_target)
+            self.target_sentences=[" ".join([vocab_target_inv[j] for j in i]) for i in self.target_sentences_a]
         translator = inference.Translator(self.context,
                                           self.ensemble_mode,
                                           self.bucket_width_source,
                                           inference.LengthPenalty(self.length_penalty_alpha, self.length_penalty_beta),
                                           models,
                                           vocab_source,
-                                          vocab_target)
+                                          vocab_target,
+                                          input_dim=self.input_dim)
         trans_wall_time = 0.0
         translations = []
         with data_io.smart_open(output_name, 'w') as output:
@@ -142,7 +146,8 @@ class CheckpointDecoder:
                 handler.handle(trans_input, trans_output)
                 translations.append(trans_output.translation)
         avg_time = trans_wall_time / len(self.input_sentences)
-
+        print(translations[0])
+        print(self.target_sentences[0])
         # TODO(fhieber): eventually add more metrics (METEOR etc.)
         return {C.BLEU_VAL: evaluate.raw_corpus_bleu(hypotheses=translations,
                                                      references=self.target_sentences,

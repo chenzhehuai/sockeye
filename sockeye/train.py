@@ -647,7 +647,8 @@ def create_training_model(model_config: model.ModelConfig,
                                             train_iter=train_iter,
                                             bucketing=not args.no_bucketing,
                                             lr_scheduler=lr_scheduler_instance,
-                                            gradient_compression_params=gradient_compression_params(args))
+                                            gradient_compression_params=gradient_compression_params(args),
+                                            input_dim=args.input_dim)
 
     # We may consider loading the params in TrainingModule, for consistency
     # with the training state saving
@@ -750,6 +751,7 @@ def main():
             vocab.vocab_to_json(vocab_target, os.path.join(output_folder, C.VOCAB_TRG_NAME) + C.JSON_SUFFIX)
 
         vocab_source_size = len(vocab_source)
+        args.input_dim=vocab_source_size
         vocab_target_size = len(vocab_target)
         logger.info("Vocabulary sizes: source=%d target=%d", vocab_source_size, vocab_target_size)
         lr_scheduler_instance = create_lr_scheduler(args, resume_training, training_state_dir)
