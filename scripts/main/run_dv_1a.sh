@@ -25,12 +25,12 @@ test_scp=$datadir/eval2000/feats.scp
 
 mkdir -p $dir
 
-sbatch -o $dir/s.log -e $dir/s.log -p $queue --gres=gpu:$ngpus   --mem=100GB  \
+sbatch -o $dir/s.log -e $dir/s.log -p $queue --gres=gpu:$ngpus   --mem=110GB  \
     $script \
     --na $na --ngpus $ngpus --mb $mb --kvstore $kvstore \
     --scp $scp --lab $lab --vscp $vscp --vlab $vlab --test_scp $test_scp --stage $tr_stage \
     --addin "$addin" \
     --translate_addin "$translate_addin" \
     --tsuffix "$tsuffix" \
-    | tee   $dir/s.id
+    2>&1 | tee   $dir/s.id
 echo $dir/s.log

@@ -63,4 +63,4 @@ if [ $stage -le 3 ]; then
      compute-wer --mode=all --text ark:$dir/text.4 ark:$dir/ali.all.4 | tee $dir/cer
 fi
 
-
+grep Sum $dir/*sw*sys

@@ -78,7 +78,7 @@ class CheckpointDecoder:
         self.max_output_length_num_stds = max_output_length_num_stds
         self.ensemble_mode = ensemble_mode
         self.beam_size = beam_size
-        self.batch_size = 16
+        self.batch_size = args.batch_size/3 #per card
         self.bucket_width_source = bucket_width_source
         self.length_penalty_alpha = length_penalty_alpha
         self.length_penalty_beta = length_penalty_beta
