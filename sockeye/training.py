@@ -92,6 +92,7 @@ class TrainingModel(model.SockeyeModel):
                  gradient_compression_params: Optional[Dict[str, Any]] = None,
                  input_dim: int = 1) -> None:
         super().__init__(config)
+        self.args=args
         self.context = context
         self.lr_scheduler = lr_scheduler
         self.bucketing = bucketing
@@ -100,7 +101,6 @@ class TrainingModel(model.SockeyeModel):
         self.module = self._build_module(train_iter)
         self.training_monitor = None  # type: Optional[callback.TrainingMonitor]
         self.input_dim=input_dim
-        self.args=args
 
     def _build_module(self, train_iter: data_io.BaseParallelSampleIter):
         """
