@@ -901,6 +901,12 @@ def add_training_args(params):
                               default=-1,
                               help='Keep only the last n params files, use -1 to keep all files. Default: %(default)s')
 
+    #add other training
+    train_params.add_argument('--schedule-sample',
+                              default=0.0,
+                              type=float,
+                              help='prob to use schedule sample targets as decoder input')
+
     #from add_inference_args
     decode_params=train_params
     decode_params.add_argument('--softmax-temperature',

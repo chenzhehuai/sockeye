@@ -92,6 +92,7 @@ class TrainingModel(model.SockeyeModel):
                  gradient_compression_params: Optional[Dict[str, Any]] = None,
                  input_dim: int = 1) -> None:
         super().__init__(config)
+        self.args=args
         self.context = context
         self.lr_scheduler = lr_scheduler
         self.bucketing = bucketing
@@ -100,7 +101,6 @@ class TrainingModel(model.SockeyeModel):
         self.module = self._build_module(train_iter)
         self.training_monitor = None  # type: Optional[callback.TrainingMonitor]
         self.input_dim=input_dim
-        self.args=args
 
     def _build_module(self, train_iter: data_io.BaseParallelSampleIter):
         """
@@ -157,10 +157,37 @@ class TrainingModel(model.SockeyeModel):
             # output layer
             # logits: (batch_size * target_seq_len, target_vocab_size)
             logits = self.output_layer(target_decoded)
+            args=self.args
+            if args.schedule_sample == 0:
 
-            probs = model_loss.get_loss(logits, labels)
+                probs = model_loss.get_loss(logits, labels)
 
+                return mx.sym.Group(probs), data_names, label_names
+
+            #gen new_target from logits & target
+            probs=[[1-args.schedule_sample, args.schedule_sample]]
+            deci=mx.symbol.sample_multinomial(probs, shape=target.shape)
+            new_target=mx.symbol.broadcast_mul(target,(1-deci))+mx.symbol.broadcast_mul(logits,(deci))
+
+            # target embedding
+            (new_target_embed,
+             new_target_embed_length,
+             new_target_embed_seq_len) = self.embedding_target.encode(new_target, target_length, target_seq_len)
+
+            # decoder
+            # target_decoded: (batch-size, target_len, decoder_depth)
+            new_target_decoded = self.decoder.decode_sequence(source_encoded, source_encoded_length, source_encoded_seq_len,
+                                                          new_target_embed, new_target_embed_length, new_target_embed_seq_len)
+
+            # target_decoded: (batch_size * target_seq_len, rnn_num_hidden)
+            new_target_decoded = mx.sym.reshape(data=new_target_decoded, shape=(-3, 0))
+
+            # output layer
+            # logits: (batch_size * target_seq_len, target_vocab_size)
+            new_logits = self.output_layer(new_target_decoded)
+            probs = model_loss.get_loss(new_logits, labels)
             return mx.sym.Group(probs), data_names, label_names
+
 
         if self.bucketing:
             logger.info("Using bucketing. Default max_seq_len=%s", train_iter.default_bucket_key)
