@@ -940,6 +940,7 @@ class Translator:
         :param source_length: Length of the input sequence.
         :param states: List of model states.
         :param models_output_layer_w: Custom model weights for logit computation (empty for none).
+        erint(model_loss)
         :param models_output_layer_b: Custom model biases for logit computation (empty for none).
         :return: (probs, attention scores, list of model states)
         """

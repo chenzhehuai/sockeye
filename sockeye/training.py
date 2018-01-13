@@ -165,9 +165,10 @@ class TrainingModel(model.SockeyeModel):
                 return mx.sym.Group(probs), data_names, label_names
 
             #gen new_target from logits & target
-            probs=[[1-args.schedule_sample, args.schedule_sample]]
-            deci=mx.symbol.sample_multinomial(probs, shape=target.shape)
-            new_target=mx.symbol.broadcast_mul(target,(1-deci))+mx.symbol.broadcast_mul(logits,(deci))
+            #probs=[[1-args.schedule_sample, args.schedule_sample]]
+            #deci=mx.symbol.sample_multinomial(probs)
+            #new_target=mx.symbol.broadcast_mul(target,(1-deci))+mx.symbol.broadcast_mul(logits,(deci))
+            new_target=mx.symbol.argmax_channel(logits)
 
             # target embedding
             (new_target_embed,
