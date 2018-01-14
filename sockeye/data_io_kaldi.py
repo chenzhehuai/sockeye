@@ -27,6 +27,7 @@ from typing import Any, cast, Dict, Iterator, Iterable, List, Optional, Sized, T
 import math
 import mxnet as mx
 import numpy as np
+import argparse
 
 from . import config
 from . import constants as C
@@ -721,7 +722,8 @@ def get_training_data_iters(source: str, target: str,
                             max_seq_len_source: int,
                             max_seq_len_target: int,
                             bucketing: bool,
-                            bucket_width: int) -> Tuple['BaseParallelSampleIter',
+                            bucket_width: int,
+                            args: argparse.Namespace) -> Tuple['BaseParallelSampleIter',
                                                         'BaseParallelSampleIter',
                                                         'DataConfig']:
     """
@@ -793,11 +795,16 @@ def get_training_data_iters(source: str, target: str,
                              max_seq_len_source=max_seq_len_source,
                              max_seq_len_target=max_seq_len_target)
 
+    if args.schedule_sample:
+        target_name=C.TARGET_NAME4INF
+    else:
+        target_name=C.TARGET_NAME
     train_iter = ParallelSampleIter(training_data,
                                     buckets,
                                     batch_size,
                                     bucket_batch_sizes,
-                                    source_embed_size=source_embed_size)
+                                    source_embed_size=source_embed_size,
+                                    target_data_name=target_name)
 
     validation_iter = get_validation_data_iter(data_loader=data_loader,
                                                validation_source=validation_source,
@@ -1263,6 +1270,14 @@ class BaseParallelSampleIter(mx.io.DataIter, ABC):
             mx.io.DataDesc(name=self.target_data_name,
                            shape=(self.bucket_batch_sizes[-1].batch_size, self.default_bucket_key[1]),
                            layout=C.BATCH_MAJOR)]
+        self.provide_data_fix = [
+            mx.io.DataDesc(name=self.source_data_name,
+                           shape=(self.bucket_batch_sizes[-1].batch_size, self.default_bucket_key[0], source_embed_size),
+                           layout=C.BATCH_MAJOR),
+            mx.io.DataDesc(name=C.TARGET_NAME,
+                           shape=(self.bucket_batch_sizes[-1].batch_size, self.default_bucket_key[1]),
+                           layout=C.BATCH_MAJOR)]
+
         self.provide_label = [
             mx.io.DataDesc(name=self.label_name,
                            shape=(self.bucket_batch_sizes[-1].batch_size, self.default_bucket_key[1]),
@@ -1314,7 +1329,7 @@ class ShardedParallelSampleIter(BaseParallelSampleIter):
         self.shards_fnames = list(shards_fnames)
         self.shard_index = -1
         self.fill_up = fill_up
-
+        
         self.reset()
 
     def _load_shard(self):

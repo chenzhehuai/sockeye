@@ -155,6 +155,7 @@ CNN_PAD_CENTERED = "centered"
 SOURCE_NAME = "source"
 SOURCE_LENGTH_NAME = "source_length"
 TARGET_NAME = "target"
+TARGET_NAME4INF = "target4inf"
 TARGET_LABEL_NAME = "target_label"
 LEXICON_NAME = "lexicon"
 

@@ -38,6 +38,7 @@ from . import lr_scheduler
 from .optimizers import BatchState, CheckpointState, SockeyeOptimizer
 from . import model
 from . import utils
+from . import inference
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +99,10 @@ class TrainingModel(model.SockeyeModel):
         self.bucketing = bucketing
         self.gradient_compression_params = gradient_compression_params
         self._build_model_components()
-        self.module = self._build_module(train_iter)
+        if self.args.schedule_sample:
+            self.module, self.module4inf = self._build_module(train_iter)
+        else:
+            self.module = self._build_module(train_iter)
         self.training_monitor = None  # type: Optional[callback.TrainingMonitor]
         self.input_dim=input_dim
 
@@ -110,14 +114,20 @@ class TrainingModel(model.SockeyeModel):
         source = mx.sym.Variable(C.SOURCE_NAME)
         source_length = utils.compute_lengths(mx.sym.flatten(mx.sym.slice_axis(source,axis=2,begin=0,end=1)))
         target = mx.sym.Variable(C.TARGET_NAME)
+        if self.args.schedule_sample:
+            target4inf = mx.sym.Variable(C.TARGET_NAME4INF)
+            target_length4inf = utils.compute_lengths(target4inf)
         target_length = utils.compute_lengths(target)
         #source_length=target_length #batch_size
         labels = mx.sym.reshape(data=mx.sym.Variable(C.TARGET_LABEL_NAME), shape=(-1,))
 
         model_loss = loss.get_loss(self.config.config_loss)
 
-        data_names = [x[0] for x in train_iter.provide_data]
+        data_names = [C.SOURCE_NAME, C.TARGET_NAME]
         label_names = [x[0] for x in train_iter.provide_label]
+
+        if self.args.schedule_sample:
+            data_names4inf=[C.SOURCE_NAME, C.TARGET_NAME4INF]
 
         def sym_gen(seq_lens):
             """
@@ -162,14 +172,75 @@ class TrainingModel(model.SockeyeModel):
 
             return mx.sym.Group(probs), data_names, label_names
 
+        def sym_gen4inf(seq_lens):
+            """
+            Returns a (grouped) loss symbol given source & target input lengths.
+            Also returns data and label names for the BucketingModule.
+            """
+            source_seq_len, target_seq_len = seq_lens
+
+            # source embedding
+            source_embed=source
+            source_embed_length=source_length
+            source_embed_seq_len=source_seq_len
+            #(source_embed,
+            # source_embed_length,
+            # source_embed_seq_len) = self.embedding_source.encode(source, source_length, source_seq_len)
+
+            # target embedding
+            (target_embed,
+             target_embed_length,
+             target_embed_seq_len) = self.embedding_target.encode(target4inf, target_length4inf, target_seq_len)
+
+            # encoder
+            # source_encoded: (source_encoded_length, batch_size, encoder_depth)
+            (source_encoded,
+             source_encoded_length,
+             source_encoded_seq_len) = self.encoder.encode(source_embed,
+                                                           source_embed_length,
+                                                           source_embed_seq_len)
+            # decoder
+            # target_decoded: (batch-size, target_len, decoder_depth)
+            target_decoded = self.decoder.decode_sequence(source_encoded, source_encoded_length, source_encoded_seq_len,
+                                                          target_embed, target_embed_length, target_embed_seq_len)
+
+            # target_decoded: (batch_size * target_seq_len, rnn_num_hidden)
+            target_decoded = mx.sym.reshape(data=target_decoded, shape=(-3, 0))
+
+            # output layer
+            # logits: (batch_size * target_seq_len, target_vocab_size)
+            logits = self.output_layer(target_decoded)
+            
+            #future usage for e.g. disc tr
+            probs = model_loss.get_loss(logits, labels)
+
+            return mx.sym.Group(probs), data_names4inf, label_names
+
+
         if self.bucketing:
             logger.info("Using bucketing. Default max_seq_len=%s", train_iter.default_bucket_key)
-            return mx.mod.BucketingModule(sym_gen=sym_gen,
+
+
+            if self.args.schedule_sample:
+                return mx.mod.BucketingModule(sym_gen=sym_gen,
+                                          logger=logger,
+                                          default_bucket_key=train_iter.default_bucket_key,
+                                          context=self.context,
+                                          compression_params=self.gradient_compression_params), mx.mod.BucketingModule(sym_gen=sym_gen4inf,
+                                          logger=logger,
+                                          default_bucket_key=train_iter.default_bucket_key,
+                                          context=self.context,
+                                          compression_params=self.gradient_compression_params)
+            else:
+                return mx.mod.BucketingModule(sym_gen=sym_gen,
                                           logger=logger,
                                           default_bucket_key=train_iter.default_bucket_key,
                                           context=self.context,
                                           compression_params=self.gradient_compression_params)
         else:
+            if self.args.schedule_sample:
+                logger.info("un-imp for schedule_sample with no bucketing")
+                exit()
             logger.info("No bucketing. Unrolled to (%d,%d)",
                         self.config.max_seq_len_source, self.config.max_seq_len_target)
             symbol, _, __ = sym_gen(train_iter.buckets[0])
@@ -273,8 +344,11 @@ class TrainingModel(model.SockeyeModel):
 
         utils.check_condition(gradient_clipping_type in C.GRADIENT_CLIPPING_TYPES,
                               "Unknown gradient clipping type %s" % gradient_clipping_type)
+        if self.args.schedule_sample:
+            self.module4inf.bind(data_shapes=train_iter.provide_data, label_shapes=train_iter.provide_label, 
+                         for_training=False, force_rebind=True, grad_req='null')
 
-        self.module.bind(data_shapes=train_iter.provide_data, label_shapes=train_iter.provide_label,
+        self.module.bind(data_shapes=train_iter.provide_data_fix, label_shapes=train_iter.provide_label,
                          for_training=True, force_rebind=True, grad_req='write')
         self.module.symbol.save(os.path.join(output_folder, C.SYMBOL_NAME))
 
@@ -419,10 +493,15 @@ class TrainingModel(model.SockeyeModel):
 
         speedometer = Speedometer(frequency=C.MEASURE_SPEED_EVERY, auto_reset=False)
 
+        cnt=0
+        if self.args.schedule_sample:
+            self.module4inf.set_params(self.module.get_params()[0],self.module.get_params()[1], force_init=True) #get newest para
         while True:
             if not train_iter.iter_next():
                 train_state.epoch += 1
                 train_iter.reset()
+                if self.args.schedule_sample:
+                    self.module4inf.set_params(self.module.get_params()[0],self.module.get_params()[1], force_init=True) #get newest para
 
             if (max_updates is not None and train_state.updates == max_updates) or \
                     (max_num_epochs is not None and train_state.epoch == max_num_epochs):
@@ -434,6 +513,27 @@ class TrainingModel(model.SockeyeModel):
 
             if mxmonitor is not None:
                 mxmonitor.tic()
+            
+            if self.args.schedule_sample:
+                if train_state.epoch>=3:
+                    self.module4inf.forward(batch)
+                    logits4inf=self.module4inf.get_outputs()[0] #gpu
+    
+                    probs=mx.nd.array([1-self.args.schedule_sample, self.args.schedule_sample], logits4inf.context, dtype=logits4inf.dtype)
+                    deci=mx.nd.array(mx.nd.sample_multinomial(probs, shape=batch.data[1].shape), logits4inf.context, dtype=logits4inf.dtype)
+                    target_data=mx.nd.reshape(mx.nd.argmax(logits4inf,axis=1), shape=batch.data[1].shape)  #batch_size * target_seq_len
+                    
+                    target_data=mx.nd.broadcast_mul(target_data,deci)+mx.nd.broadcast_mul(batch.data[1].as_in_context(deci.context),(1-deci))
+
+                    if cnt%200==0:
+                        print("batch: {} inf_tar+lab seq exp: {}".format(cnt,target_data[0]))
+                else:
+                    target_data=batch.data[1]
+    
+                batch= mx.io.DataBatch((batch.data[0],target_data), batch.label,
+                               pad=batch.pad, index=batch.index, bucket_key=batch.bucket_key,
+                               provide_data=[batch.provide_data[0],mx.io.DataDesc(name=C.TARGET_NAME, shape=batch.data[1].shape, layout=C.BATCH_MAJOR)], provide_label=batch.provide_label)
+                cnt+=1
 
             # Forward-backward to get outputs, gradients
             self.module.forward_backward(batch)
@@ -476,7 +576,10 @@ class TrainingModel(model.SockeyeModel):
             if train_iter.iter_next():
                 # pre-fetch next batch
                 next_data_batch = train_iter.next()
-                self.module.prepare(next_data_batch)
+                if self.args.schedule_sample:
+                    self.module4inf.prepare(next_data_batch)
+                else:
+                    self.module.prepare(next_data_batch)
 
             batch_num_samples = batch.data[0].shape[0]
             batch_num_tokens = batch.data[0].shape[1] * batch_num_samples
