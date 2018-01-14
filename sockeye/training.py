@@ -515,13 +515,14 @@ class TrainingModel(model.SockeyeModel):
                 mxmonitor.tic()
             
             if self.args.schedule_sample:
-                if train_state.epoch>=3:
+                if train_state.epoch>=self.args.schedule_sample_start_epoch:
                     self.module4inf.forward(batch)
                     logits4inf=self.module4inf.get_outputs()[0] #gpu
     
                     probs=mx.nd.array([1-self.args.schedule_sample, self.args.schedule_sample], logits4inf.context, dtype=logits4inf.dtype)
                     deci=mx.nd.array(mx.nd.sample_multinomial(probs, shape=batch.data[1].shape), logits4inf.context, dtype=logits4inf.dtype)
                     target_data=mx.nd.reshape(mx.nd.argmax(logits4inf,axis=1), shape=batch.data[1].shape)  #batch_size * target_seq_len
+                    target_data=mx.nd.concat(mx.nd.full((target_data.shape[0],1),2,ctx=logits4inf.context,dtype=logits4inf.dtype),mx.nd.slice(target_data, begin=(0,0), end=(target_data.shape[0],target_data.shape[1]-1)),dim=1)
                     
                     target_data=mx.nd.broadcast_mul(target_data,deci)+mx.nd.broadcast_mul(batch.data[1].as_in_context(deci.context),(1-deci))
 

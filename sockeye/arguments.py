@@ -906,6 +906,11 @@ def add_training_args(params):
                               default=0.0,
                               type=float,
                               help='prob to use schedule sample targets as decoder input')
+    train_params.add_argument('--schedule-sample-start-epoch',
+                              default=5,
+                              type=int,
+                              help='prob to use schedule sample targets as decoder input')
+
 
     #from add_inference_args
     decode_params=train_params
