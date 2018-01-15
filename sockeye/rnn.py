@@ -20,7 +20,7 @@ from sockeye.config import Config
 from sockeye.layers import LayerNormalization
 from . import constants as C
 from . import utils
-
+import argparse
 
 class RNNConfig(Config):
     """
@@ -47,7 +47,8 @@ class RNNConfig(Config):
                  dropout_recurrent: float = 0,
                  residual: bool = False,
                  first_residual_layer: int = 2,
-                 forget_bias: float = 0.0) -> None:
+                 forget_bias: float = 0.0,
+                 args: argparse.Namespace = None) -> None:
         super().__init__()
         self.cell_type = cell_type
         self.num_hidden = num_hidden
@@ -58,6 +59,7 @@ class RNNConfig(Config):
         self.residual = residual
         self.first_residual_layer = first_residual_layer
         self.forget_bias = forget_bias
+        self.args=args
 
 
 class SequentialRNNCellParallelInput(mx.rnn.SequentialRNNCell):

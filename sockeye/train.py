@@ -449,7 +449,8 @@ def create_encoder_config(args: argparse.Namespace,
                                      dropout_recurrent=encoder_rnn_dropout_recurrent,
                                      residual=args.rnn_residual_connections,
                                      first_residual_layer=args.rnn_first_residual_layer,
-                                     forget_bias=args.rnn_forget_bias),
+                                     forget_bias=args.rnn_forget_bias,
+                                     args=args),
             conv_config=config_conv,
             reverse_input=args.rnn_encoder_reverse_input)
         encoder_num_hidden = args.rnn_num_hidden

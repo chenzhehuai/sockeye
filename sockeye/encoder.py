@@ -111,19 +111,19 @@ def get_recurrent_encoder(config: RecurrentEncoderConfig) -> 'Encoder':
         encoders.append(ReverseSequence())
 
     if config.rnn_config.residual:
-        utils.check_condition(config.rnn_config.first_residual_layer >= 2,
-                              "Residual connections on the first encoder layer are not supported")
+        utils.check_condition(config.rnn_config.first_residual_layer >= 1+config.rnn_config.args.rnn_num_bi_layer,
+                              "Residual connections on the blstm encoder layer are not supported")
 
-    # One layer bi-directional RNN:
-    encoders.append(BiDirectionalRNNEncoder(rnn_config=config.rnn_config.copy(num_layers=1),
+    # args.rnn_num_bi_layer  layer bi-directional RNN:
+    encoders.append(BiDirectionalRNNEncoder(rnn_config=config.rnn_config.copy(num_layers=config.rnn_config.args.rnn_num_bi_layer),
                                             prefix=C.BIDIRECTIONALRNN_PREFIX,
                                             layout=C.TIME_MAJOR))
 
-    if config.rnn_config.num_layers > 1:
+    if config.rnn_config.num_layers > config.rnn_config.args.rnn_num_bi_layer:
         # Stacked uni-directional RNN:
         # Because we already have a one layer bi-rnn we reduce the num_layers as well as the first_residual_layer.
-        remaining_rnn_config = config.rnn_config.copy(num_layers=config.rnn_config.num_layers - 1,
-                                                      first_residual_layer=config.rnn_config.first_residual_layer - 1)
+        remaining_rnn_config = config.rnn_config.copy(num_layers=config.rnn_config.num_layers - config.rnn_config.args.rnn_num_bi_layer,
+                                                      first_residual_layer=config.rnn_config.first_residual_layer - config.rnn_config.args.rnn_num_bi_layer)
         encoders.append(RecurrentEncoder(rnn_config=remaining_rnn_config,
                                       prefix=C.STACKEDRNN_PREFIX,
                                       layout=C.TIME_MAJOR))

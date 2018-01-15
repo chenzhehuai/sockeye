@@ -525,6 +525,11 @@ def add_model_parameters(params):
     model_params.add_argument('--rnn-context-gating', action="store_true",
                               help="Enables a context gate which adaptively weighs the RNN decoder input against the "
                                    "source context vector before each update of the decoder hidden state.")
+    model_params.add_argument('--rnn-num-bi-layer',
+                              type=int_greater_or_equal(1),
+                              default=1,
+                              help='Number of bi RNN layer for encoder.  Default: %(default)s.')
+
 
     # transformer arguments
     model_params.add_argument('--transformer-model-size',
