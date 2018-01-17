@@ -110,9 +110,9 @@ def get_recurrent_encoder(config: RecurrentEncoderConfig) -> 'Encoder':
     if config.reverse_input:
         encoders.append(ReverseSequence())
 
-    if config.rnn_config.residual:
-        utils.check_condition(config.rnn_config.first_residual_layer >= 1+config.rnn_config.args.rnn_num_bi_layer,
-                              "Residual connections on the blstm encoder layer are not supported")
+    #if config.rnn_config.residual:
+    #    utils.check_condition(config.rnn_config.first_residual_layer >= 1+config.rnn_config.args.rnn_num_bi_layer,
+    #                          "Residual connections on the blstm encoder layer are not supported")
 
     # args.rnn_num_bi_layer  layer bi-directional RNN:
     encoders.append(BiDirectionalRNNEncoder(rnn_config=config.rnn_config.copy(num_layers=config.rnn_config.args.rnn_num_bi_layer),
