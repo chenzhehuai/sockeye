@@ -221,8 +221,8 @@ class LayerNormLSTMCell(mx.rnn.LSTMCell):
         h2h = mx.sym.FullyConnected(data=states[0], weight=self._hW, bias=self._hB,
                                     num_hidden=self._num_hidden * 4,
                                     name='%sh2h' % name)
-        #gates = self._iN.normalize(i2h) + self._hN.normalize(self._shape_fix + h2h)
-        gates = i2h + self._hN.normalize(self._shape_fix + h2h)
+        gates = self._iN.normalize(i2h) + self._hN.normalize(self._shape_fix + h2h)
+        #gates = i2h + self._hN.normalize(self._shape_fix + h2h)
         # pylint: disable=unbalanced-tuple-unpacking
         in_gate, forget_gate, in_transform, out_gate = mx.sym.split(gates,
                                                                     num_outputs=4,
