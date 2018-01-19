@@ -421,9 +421,11 @@ class RawParallelDatasetLoader:
             print("source_embed_size: %i" %self.source_embed_size)
             data_source = [np.full((num_samples, source_len, self.source_embed_size), self.pad_id, dtype=self.dtype)
                         for (source_len, target_len), num_samples in zip(self.buckets, num_samples_per_bucket)]
+            print(data_source[0].shape)
 
         data_target = [np.full((num_samples, target_len), self.pad_id, dtype=self.dtype)
                        for (source_len, target_len), num_samples in zip(self.buckets, num_samples_per_bucket)]
+        print(data_target[0].shape)
         data_label = [np.full((num_samples, target_len), self.pad_id, dtype=self.dtype)
                       for (source_len, target_len), num_samples in zip(self.buckets, num_samples_per_bucket)]
 
